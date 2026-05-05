@@ -2,7 +2,6 @@ const data = window.PUREFLOW_LEADS;
 
 const navItems = [
   { id: "dashboard", label: "Dashboard", icon: "dashboard" },
-  { id: "CRM Mode", label: "CRM Mode", icon: "crm" },
   { id: "Mini Route Guide", label: "Mini Route Guide", icon: "route" },
   { id: "A Walk First", label: "A Walk First", icon: "target" },
   { id: "B Review Route Fill", label: "B Review", icon: "review" },
@@ -62,6 +61,7 @@ const state = {
   segment: "All",
   tier: "All",
   crmStatus: "All",
+  crmGuideOpen: false,
   minScore: 0,
 };
 
@@ -88,6 +88,7 @@ const els = {
   scoreFilter: document.getElementById("scoreFilter"),
   scoreOutput: document.getElementById("scoreOutput"),
   resetFilters: document.getElementById("resetFilters"),
+  crmModeAction: document.getElementById("crmModeAction"),
   drawer: document.getElementById("leadDrawer"),
   drawerContent: document.getElementById("drawerContent"),
   drawerClose: document.getElementById("drawerClose"),
@@ -260,11 +261,12 @@ function downloadCsv(filename, rows) {
 }
 
 function navCount(item) {
-  if (item.id === "dashboard" || item.id === "CRM Mode") return data.allLeads.length;
+  if (item.id === "dashboard") return data.allLeads.length;
   return sheetRows(item.id).length;
 }
 
 function renderNav() {
+  els.crmModeAction.classList.toggle("active", state.view === "CRM Mode");
   els.navList.innerHTML = navItems
     .map((item) => {
       const active = item.id === state.view ? " active" : "";
@@ -689,6 +691,84 @@ function crmSummary(rows) {
   ];
 }
 
+function crmGuide() {
+  const steps = [
+    ["01", "Find Lead", "Use search, city, segment, or route filters. Click the business row.", "target"],
+    ["02", "Set Status", "Pick the real outcome: Knocked, Interested, Callback, Quoted, Won, Lost, or Bad Fit.", "crm"],
+    ["03", "Add Next Step", "Type rep name. Add follow-up date if anyone needs a callback.", "verify"],
+    ["04", "Write Note", "One sentence is enough: who you talked to, water setup, next move.", "review"],
+    ["05", "Save", "Press Save CRM Update before closing the lead drawer.", "credit"],
+  ];
+  const statuses = [
+    ["Not Contacted", "Nobody has worked it yet."],
+    ["Knocked", "Stopped by. Use if no buyer yet."],
+    ["Interested", "They might buy. Add details."],
+    ["Callback", "Needs a date. Do not leave blank."],
+    ["Quoted", "Quote sent or pricing discussed."],
+    ["Won", "Sold. Nice."],
+    ["Lost / Bad Fit", "Done for now. Add why."],
+  ];
+  return `
+    <section class="panel crm-guide-panel${state.crmGuideOpen ? "" : " collapsed"}" data-crm-guide>
+      <div class="panel-head">
+        <div>
+          <h2 class="panel-title">CRM Mode Quick Guide</h2>
+          <p class="panel-subtitle">Simple field workflow for reps. Five clicks, then move on.</p>
+        </div>
+      </div>
+      <div class="guide-flow">
+        ${steps
+          .map(
+            ([num, title, copy, icon]) => `
+              <div class="guide-step">
+                <div class="guide-art">
+                  <span>${num}</span>
+                  ${iconSvg(icon)}
+                </div>
+                <strong>${escapeHtml(title)}</strong>
+                <p>${escapeHtml(copy)}</p>
+              </div>
+            `,
+          )
+          .join("")}
+      </div>
+      <div class="guide-board">
+        <div class="guide-phone">
+          <div class="guide-row"><span>A</span><strong>Business Row</strong><em>Click lead</em></div>
+          <div class="guide-panel-mini">
+            <span>Status</span>
+            <strong>Callback</strong>
+            <span>Rep</span>
+            <strong>Ben</strong>
+            <span>Date</span>
+            <strong>${todayIso()}</strong>
+          </div>
+          <div class="guide-note-card">Note: talked to manager, has jug water, call Friday.</div>
+        </div>
+        <div class="guide-rules">
+          <h3>Status Cheat Sheet</h3>
+          <div class="status-cheat-grid">
+            ${statuses
+              .map(
+                ([status, meaning]) => `
+                  <div>
+                    <span class="pill ${status === "Interested" || status === "Quoted" || status === "Won" ? "a" : status === "Callback" || status === "Knocked" ? "b" : "c"}">${escapeHtml(status)}</span>
+                    <p>${escapeHtml(meaning)}</p>
+                  </div>
+                `,
+              )
+              .join("")}
+          </div>
+          <div class="guide-do-list">
+            <strong>Rep rules</strong>
+            <p>Never leave a good lead with no next step. Callback always needs a date. Notes should say who, current water, and next action.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+  `;
+}
+
 function renderCrmMode() {
   const rows = crmRows();
   const summaryRows = applyFilters(data.allLeads);
@@ -700,6 +780,7 @@ function renderCrmMode() {
           <p class="panel-subtitle">Local notes, status, follow-ups, and export tools for this browser.</p>
         </div>
         <div class="drawer-actions crm-actions">
+          <button class="ghost-action" type="button" data-crm-guide-toggle>${state.crmGuideOpen ? "Hide guide" : "How it works"}</button>
           <button class="ghost-action" type="button" data-export="crm-notes">Export notes CSV</button>
           <button class="primary-action" type="button" data-export="twenty">Twenty import CSV</button>
         </div>
@@ -724,6 +805,7 @@ function renderCrmMode() {
           .join("")}
       </div>
     </section>
+    ${crmGuide()}
     <section class="panel table-panel">
       <div class="table-toolbar">
         <div>
@@ -1010,6 +1092,12 @@ function exportTwentyCsv() {
 }
 
 function bindViewActions() {
+  els.viewRoot.querySelectorAll("[data-crm-guide-toggle]").forEach((button) => {
+    button.addEventListener("click", () => {
+      state.crmGuideOpen = !state.crmGuideOpen;
+      renderView();
+    });
+  });
   els.viewRoot.querySelectorAll("[data-export]").forEach((button) => {
     button.addEventListener("click", () => {
       if (button.dataset.export === "crm-notes") exportCrmNotes();
@@ -1230,6 +1318,10 @@ function bindEvents() {
     els.tierFilter.value = "All";
     els.scoreFilter.value = "0";
     els.scoreOutput.textContent = "0+";
+    renderView();
+  });
+  els.crmModeAction.addEventListener("click", () => {
+    state.view = "CRM Mode";
     renderView();
   });
   els.drawerClose.addEventListener("click", closeDrawer);
