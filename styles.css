@@ -888,6 +888,179 @@ h1 {
   transform: translateY(-2px);
 }
 
+.crm-command-panel {
+  margin-bottom: 18px;
+}
+
+.crm-actions {
+  margin-top: 0;
+}
+
+.crm-alert {
+  margin: 18px;
+  border: 1px solid rgba(230, 81, 0, 0.24);
+  border-radius: 8px;
+  padding: 12px 14px;
+  background: rgba(230, 81, 0, 0.08);
+  color: var(--pf-navy);
+  font-size: 0.84rem;
+  font-weight: 700;
+}
+
+.crm-kpis {
+  margin: 0;
+  padding: 0 18px 18px;
+}
+
+.crm-status-filter {
+  display: grid;
+  gap: 6px;
+  min-width: 190px;
+}
+
+.crm-status-filter span,
+.crm-form-grid span,
+.crm-note-box span {
+  color: var(--pf-muted);
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.crm-status-filter select,
+.crm-form-grid input,
+.crm-form-grid select,
+.crm-note-box textarea {
+  width: 100%;
+  border: 1px solid var(--pf-line);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--pf-ink);
+}
+
+.crm-status-filter select,
+.crm-form-grid input,
+.crm-form-grid select {
+  min-height: 40px;
+  padding: 0 10px;
+}
+
+.muted-line {
+  display: inline-block;
+  margin-top: 4px;
+  color: var(--pf-muted);
+  font-size: 0.74rem;
+  font-weight: 700;
+}
+
+.crm-editor {
+  margin: 18px 0;
+  border: 1px solid var(--pf-line);
+  border-radius: 8px;
+  padding: 14px;
+  background: #f8fcfe;
+}
+
+.crm-editor-head {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.crm-editor h3 {
+  margin: 0;
+  color: var(--pf-navy);
+  font-size: 1rem;
+}
+
+.crm-editor p {
+  margin: 4px 0 0;
+  color: var(--pf-muted);
+  font-size: 0.78rem;
+}
+
+.crm-form-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.crm-form-grid label,
+.crm-note-box {
+  display: grid;
+  gap: 6px;
+}
+
+.crm-note-box {
+  margin-top: 12px;
+}
+
+.crm-note-box textarea {
+  min-height: 110px;
+  padding: 10px;
+  resize: vertical;
+}
+
+.crm-quick-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.crm-quick-actions button {
+  min-height: 34px;
+  border: 1px solid var(--pf-line);
+  border-radius: 8px;
+  padding: 0 10px;
+  background: #fff;
+  color: var(--pf-navy);
+  font-size: 0.75rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.crm-save-status {
+  align-self: center;
+  color: var(--pf-success);
+  font-size: 0.8rem;
+  font-weight: 800;
+}
+
+.crm-note-list {
+  display: grid;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.crm-note,
+.crm-empty-note {
+  border: 1px solid var(--pf-line);
+  border-radius: 8px;
+  padding: 10px;
+  background: #fff;
+}
+
+.crm-note span {
+  color: var(--pf-muted);
+  font-size: 0.68rem;
+  font-weight: 800;
+}
+
+.crm-note p {
+  margin: 4px 0 0;
+  color: var(--pf-ink);
+  font-size: 0.84rem;
+}
+
+.crm-empty-note {
+  color: var(--pf-muted);
+  font-size: 0.84rem;
+}
+
 .badge-line {
   display: flex;
   flex-wrap: wrap;
@@ -1172,6 +1345,10 @@ tbody tr:hover {
   .filter-strip {
     grid-template-columns: 1fr;
     position: static;
+  }
+
+  .crm-form-grid {
+    grid-template-columns: 1fr;
   }
 
   .bar-row {

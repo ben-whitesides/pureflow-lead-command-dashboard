@@ -2,6 +2,7 @@ const data = window.PUREFLOW_LEADS;
 
 const navItems = [
   { id: "dashboard", label: "Dashboard", icon: "dashboard" },
+  { id: "CRM Mode", label: "CRM Mode", icon: "crm" },
   { id: "Mini Route Guide", label: "Mini Route Guide", icon: "route" },
   { id: "A Walk First", label: "A Walk First", icon: "target" },
   { id: "B Review Route Fill", label: "B Review", icon: "review" },
@@ -60,8 +61,22 @@ const state = {
   city: "All",
   segment: "All",
   tier: "All",
+  crmStatus: "All",
   minScore: 0,
 };
+
+const CRM_STORAGE_KEY = "pureflow_lead_command_crm_v1";
+const crmStatuses = [
+  "Not Contacted",
+  "Knocked",
+  "Contacted",
+  "Interested",
+  "Callback",
+  "Quoted",
+  "Won",
+  "Lost",
+  "Bad Fit",
+];
 
 const els = {
   navList: document.getElementById("navList"),
@@ -109,11 +124,64 @@ function iconSvg(name) {
     verify: '<path d="M5 12l4 4L19 6" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>',
     source: '<path d="M6 5h12v14H6V5Zm3 4h6M9 13h6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>',
     credit: '<path d="M12 3 20 6v6c0 5-3.4 8-8 9-4.6-1-8-4-8-9V6l8-3Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M8.5 12.2 11 14.7l4.8-5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>',
+    crm: '<path d="M4 7h16v13H4V7Zm4 0V5h8v2" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M8 12h8M8 16h5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>',
     water: '<path d="M12 3c4 5 6 8 6 11a6 6 0 0 1-12 0c0-3 2-6 6-11Z" fill="none" stroke="currentColor" stroke-width="2"/><path d="M9 15c1.2 1.1 3.8 1.1 6 0" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>',
     filter: '<path d="M4 5h16l-6 7v5l-4 2v-7L4 5Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>',
     map: '<path d="M9 18 4 20V6l5-2 6 2 5-2v14l-5 2-6-2Zm0 0V4m6 16V6" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>',
   };
   return `<svg viewBox="0 0 24 24" aria-hidden="true">${icons[name] || icons.dashboard}</svg>`;
+}
+
+function normalizeKey(value) {
+  return String(value ?? "")
+    .toLowerCase()
+    .replace(/&/g, " and ")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+function leadId(row) {
+  const raw = [row.business_name, row.city, row.address, row.source_url].map(normalizeKey).join("|");
+  let hash = 0;
+  for (let index = 0; index < raw.length; index++) {
+    hash = (hash * 31 + raw.charCodeAt(index)) >>> 0;
+  }
+  return `pf_${hash.toString(36)}`;
+}
+
+function loadCrmState() {
+  try {
+    return JSON.parse(window.localStorage.getItem(CRM_STORAGE_KEY) || "{}");
+  } catch {
+    return {};
+  }
+}
+
+let crmState = loadCrmState();
+
+function saveCrmState() {
+  window.localStorage.setItem(CRM_STORAGE_KEY, JSON.stringify(crmState));
+}
+
+function crmRecord(row) {
+  return crmState[leadId(row)] || {
+    status: "Not Contacted",
+    owner: "",
+    followUp: "",
+    notes: [],
+    updatedAt: "",
+  };
+}
+
+function updateCrmRecord(row, patch) {
+  const id = leadId(row);
+  crmState[id] = {
+    ...crmRecord(row),
+    ...patch,
+    updatedAt: new Date().toISOString(),
+  };
+  saveCrmState();
+  return crmState[id];
 }
 
 function sheetRows(sheetName) {
@@ -165,8 +233,34 @@ function countBy(rows, key) {
   return [...counts.entries()].sort((a, b) => b[1] - a[1]);
 }
 
+function todayIso() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function formatShortDate(value) {
+  if (!value) return "";
+  return String(value).slice(0, 10);
+}
+
+function csvCell(value) {
+  const text = String(value ?? "");
+  return /[",\n]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text;
+}
+
+function downloadCsv(filename, rows) {
+  const csv = rows.map((row) => row.map(csvCell).join(",")).join("\n");
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(blob);
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  URL.revokeObjectURL(link.href);
+  link.remove();
+}
+
 function navCount(item) {
-  if (item.id === "dashboard") return data.allLeads.length;
+  if (item.id === "dashboard" || item.id === "CRM Mode") return data.allLeads.length;
   return sheetRows(item.id).length;
 }
 
@@ -561,6 +655,133 @@ function renderDashboard() {
   `;
 }
 
+function crmRows() {
+  const filtered = applyFilters(data.allLeads);
+  const rows = state.crmStatus === "All"
+    ? filtered
+    : filtered.filter((row) => crmRecord(row).status === state.crmStatus);
+  return rows.slice().sort((a, b) => {
+    const ar = crmRecord(a);
+    const br = crmRecord(b);
+    const aDue = ar.followUp || "9999-12-31";
+    const bDue = br.followUp || "9999-12-31";
+    return (
+      aDue.localeCompare(bDue) ||
+      String(ar.status).localeCompare(String(br.status)) ||
+      Number(b.lead_score || 0) - Number(a.lead_score || 0)
+    );
+  });
+}
+
+function crmSummary(rows) {
+  const touched = rows.filter((row) => crmRecord(row).status !== "Not Contacted" || crmRecord(row).notes.length).length;
+  const dueToday = rows.filter((row) => {
+    const record = crmRecord(row);
+    return record.followUp && record.followUp <= todayIso() && !["Won", "Lost", "Bad Fit"].includes(record.status);
+  }).length;
+  const pipeline = rows.filter((row) => ["Interested", "Callback", "Quoted"].includes(crmRecord(row).status)).length;
+  const won = rows.filter((row) => crmRecord(row).status === "Won").length;
+  return [
+    [touched, "Touched leads", "Rows with notes or status updates", "crm"],
+    [dueToday, "Due now", "Follow-ups due today or earlier", "verify"],
+    [pipeline, "Active pipeline", "Interested, callback, or quoted", "target"],
+    [won, "Won", "Closed wins tracked locally", "credit"],
+  ];
+}
+
+function renderCrmMode() {
+  const rows = crmRows();
+  const summaryRows = applyFilters(data.allLeads);
+  els.viewRoot.innerHTML = `
+    <section class="panel crm-command-panel">
+      <div class="panel-head">
+        <div>
+          <h2 class="panel-title">CRM Mode</h2>
+          <p class="panel-subtitle">Local notes, status, follow-ups, and export tools for this browser.</p>
+        </div>
+        <div class="drawer-actions crm-actions">
+          <button class="ghost-action" type="button" data-export="crm-notes">Export notes CSV</button>
+          <button class="primary-action" type="button" data-export="twenty">Twenty import CSV</button>
+        </div>
+      </div>
+      <div class="crm-alert">
+        Local CRM data is saved in this browser only. Use the Supabase setup below when you want shared team notes.
+      </div>
+      <div class="kpi-grid crm-kpis">
+        ${crmSummary(summaryRows)
+          .map(
+            ([value, label, note, icon]) => `
+              <div class="kpi-card">
+                <div class="kpi-icon">${iconSvg(icon)}</div>
+                <div>
+                  <span class="kpi-value">${formatNumber(value)}</span>
+                  <div class="kpi-label">${escapeHtml(label)}</div>
+                  <p class="kpi-note">${escapeHtml(note)}</p>
+                </div>
+              </div>
+            `,
+          )
+          .join("")}
+      </div>
+    </section>
+    <section class="panel table-panel">
+      <div class="table-toolbar">
+        <div>
+          <h2 class="panel-title">Rep Work Queue</h2>
+          <p class="panel-subtitle">${formatNumber(rows.length)} visible CRM rows after filters</p>
+        </div>
+        <label class="crm-status-filter">
+          <span>Status</span>
+          <select data-crm-status-filter>
+            ${["All", ...crmStatuses].map((status) => `<option value="${escapeHtml(status)}"${status === state.crmStatus ? " selected" : ""}>${escapeHtml(status)}</option>`).join("")}
+          </select>
+        </label>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Status</th>
+              <th>Follow-Up</th>
+              <th>Owner</th>
+              <th>Lead</th>
+              <th>Credit Proxy</th>
+              <th>City</th>
+              <th>Business</th>
+              <th>Segment</th>
+              <th>Last Note</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rows
+              .map((row, index) => {
+                const record = crmRecord(row);
+                const lastNote = record.notes[0]?.text || "";
+                return `
+                  <tr data-row-index="${index}">
+                    <td>${tableCell("crm_status", record.status)}</td>
+                    <td>${escapeHtml(formatShortDate(record.followUp) || "Not set")}</td>
+                    <td>${escapeHtml(record.owner || "Unassigned")}</td>
+                    <td>${tableCell("priority_tier", row.priority_tier)} ${tableCell("lead_score", row.lead_score)}</td>
+                    <td>${tableCell("financial_quality_tier", row.financial_quality_tier)} ${tableCell("financial_quality_score", row.financial_quality_score)}</td>
+                    <td>${escapeHtml(row.city)}</td>
+                    <td><strong>${escapeHtml(row.business_name)}</strong><br><span class="muted-line">${escapeHtml(row.address || "Address not listed")}</span></td>
+                    <td>${escapeHtml(row.sales_segment)}</td>
+                    <td>${escapeHtml(lastNote.slice(0, 130))}</td>
+                  </tr>
+                `;
+              })
+              .join("")}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  `;
+  [...els.viewRoot.querySelectorAll("tbody tr")].forEach((tr) => {
+    tr.addEventListener("click", () => openDrawer(rows[Number(tr.dataset.rowIndex)]));
+  });
+}
+
 function columnLabel(key) {
   return key
     .replaceAll("_", " ")
@@ -594,8 +815,12 @@ function tableCell(key, value) {
     if (!value) return "";
     return `<a href="${escapeHtml(value)}" target="_blank" rel="noreferrer">${escapeHtml(String(value).replace(/^https?:\/\//, "").slice(0, 46))}</a>`;
   }
-  if (key === "priority_tier" || key === "financial_quality_tier") {
-    const cls = String(value).startsWith("A") ? "a" : String(value).startsWith("B") ? "b" : "c";
+  if (key === "priority_tier" || key === "financial_quality_tier" || key === "crm_status") {
+    const cls = String(value).startsWith("A") || ["Interested", "Quoted", "Won"].includes(value)
+      ? "a"
+      : String(value).startsWith("B") || ["Knocked", "Contacted", "Callback"].includes(value)
+        ? "b"
+        : "c";
     return `<span class="pill ${cls}">${escapeHtml(value)}</span>`;
   }
   return escapeHtml(value);
@@ -687,6 +912,7 @@ function renderCreditProxy() {
 function renderView() {
   renderNav();
   if (state.view === "dashboard") renderDashboard();
+  else if (state.view === "CRM Mode") renderCrmMode();
   else if (state.view === "Mini Route Guide") renderRouteGuide();
   else if (state.view === "Credit Proxy Check") renderCreditProxy();
   else if (state.view === "Sources") renderSources();
@@ -694,7 +920,108 @@ function renderView() {
   bindViewActions();
 }
 
+function crmExportRows() {
+  return data.allLeads.map((row) => {
+    const record = crmRecord(row);
+    return { row, record, id: leadId(row) };
+  });
+}
+
+function exportCrmNotes() {
+  const header = [
+    "lead_id",
+    "business_name",
+    "city",
+    "sales_segment",
+    "status",
+    "owner",
+    "follow_up",
+    "updated_at",
+    "latest_note",
+    "all_notes",
+    "lead_score",
+    "priority_tier",
+    "financial_quality_tier",
+    "recommended_terms",
+    "address",
+    "phone",
+    "website",
+  ];
+  const rows = crmExportRows().map(({ row, record, id }) => [
+    id,
+    row.business_name,
+    row.city,
+    row.sales_segment,
+    record.status,
+    record.owner,
+    record.followUp,
+    record.updatedAt,
+    record.notes[0]?.text || "",
+    record.notes.map((note) => `${note.createdAt}: ${note.text}`).join(" | "),
+    row.lead_score,
+    row.priority_tier,
+    row.financial_quality_tier,
+    row.recommended_terms,
+    row.address,
+    row.phone,
+    row.website,
+  ]);
+  downloadCsv(`pureflow-crm-notes-${todayIso()}.csv`, [header, ...rows]);
+}
+
+function exportTwentyCsv() {
+  const header = [
+    "Name",
+    "Domain Name",
+    "Phone",
+    "Address",
+    "City",
+    "Lead Score",
+    "Priority Tier",
+    "Financial Quality Tier",
+    "Recommended Terms",
+    "Sales Segment",
+    "CRM Status",
+    "Assigned Owner",
+    "Follow Up Date",
+    "Pitch Angle",
+    "Notes",
+    "Source URL",
+  ];
+  const rows = crmExportRows().map(({ row, record }) => [
+    row.business_name,
+    row.website ? String(row.website).replace(/^https?:\/\//, "").split("/")[0] : "",
+    row.phone,
+    row.address,
+    row.city,
+    row.lead_score,
+    row.priority_tier,
+    row.financial_quality_tier,
+    row.recommended_terms,
+    row.sales_segment,
+    record.status,
+    record.owner,
+    record.followUp,
+    row.pitch_angle,
+    record.notes.map((note) => `${note.createdAt}: ${note.text}`).join(" | "),
+    row.source_url,
+  ]);
+  downloadCsv(`pureflow-twenty-import-${todayIso()}.csv`, [header, ...rows]);
+}
+
 function bindViewActions() {
+  els.viewRoot.querySelectorAll("[data-export]").forEach((button) => {
+    button.addEventListener("click", () => {
+      if (button.dataset.export === "crm-notes") exportCrmNotes();
+      if (button.dataset.export === "twenty") exportTwentyCsv();
+    });
+  });
+  els.viewRoot.querySelectorAll("[data-crm-status-filter]").forEach((select) => {
+    select.addEventListener("change", () => {
+      state.crmStatus = select.value;
+      renderView();
+    });
+  });
   els.viewRoot.querySelectorAll("[data-view-jump]").forEach((button) => {
     button.addEventListener("click", () => {
       state.view = button.dataset.viewJump;
@@ -716,6 +1043,98 @@ function bindViewActions() {
       state.view = "A Walk First";
       renderView();
     });
+  });
+}
+
+function renderNoteList(record) {
+  if (!record.notes.length) {
+    return '<div class="crm-empty-note">No notes yet.</div>';
+  }
+  return record.notes
+    .slice(0, 8)
+    .map(
+      (note) => `
+        <div class="crm-note">
+          <span>${escapeHtml(formatShortDate(note.createdAt))}</span>
+          <p>${escapeHtml(note.text)}</p>
+        </div>
+      `,
+    )
+    .join("");
+}
+
+function crmEditor(row) {
+  const record = crmRecord(row);
+  return `
+    <section class="crm-editor" data-lead-id="${escapeHtml(leadId(row))}">
+      <div class="crm-editor-head">
+        <div>
+          <h3>CRM Notes</h3>
+          <p>Saved locally in this browser until Supabase team sync is connected.</p>
+        </div>
+        <span class="pill">${escapeHtml(record.status)}</span>
+      </div>
+      <div class="crm-form-grid">
+        <label>
+          <span>Status</span>
+          <select data-crm-field="status">
+            ${crmStatuses.map((status) => `<option value="${escapeHtml(status)}"${status === record.status ? " selected" : ""}>${escapeHtml(status)}</option>`).join("")}
+          </select>
+        </label>
+        <label>
+          <span>Assigned Rep</span>
+          <input data-crm-field="owner" type="text" value="${escapeHtml(record.owner)}" placeholder="Rep name" />
+        </label>
+        <label>
+          <span>Follow-Up</span>
+          <input data-crm-field="followUp" type="date" value="${escapeHtml(record.followUp)}" />
+        </label>
+      </div>
+      <label class="crm-note-box">
+        <span>New Note</span>
+        <textarea data-crm-field="note" rows="4" placeholder="Talked to owner, current water setup, objections, next step..."></textarea>
+      </label>
+      <div class="crm-quick-actions">
+        <button type="button" data-crm-quick="Knocked - no answer">No answer</button>
+        <button type="button" data-crm-quick="Talked to manager">Talked to manager</button>
+        <button type="button" data-crm-quick="Has jug/bottle water today">Has jug water</button>
+        <button type="button" data-crm-quick="Asked for callback">Callback</button>
+      </div>
+      <div class="drawer-actions">
+        <button class="primary-action" type="button" data-crm-save>Save CRM Update</button>
+        <span class="crm-save-status" aria-live="polite"></span>
+      </div>
+      <div class="crm-note-list" data-crm-note-list>${renderNoteList(record)}</div>
+    </section>
+  `;
+}
+
+function bindDrawerCrm(row) {
+  const root = els.drawerContent.querySelector(".crm-editor");
+  if (!root) return;
+  root.querySelectorAll("[data-crm-quick]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const note = root.querySelector('[data-crm-field="note"]');
+      note.value = note.value ? `${note.value}\n${button.dataset.crmQuick}` : button.dataset.crmQuick;
+      if (button.dataset.crmQuick.includes("Callback")) root.querySelector('[data-crm-field="status"]').value = "Callback";
+    });
+  });
+  root.querySelector("[data-crm-save]").addEventListener("click", () => {
+    const current = crmRecord(row);
+    const noteText = root.querySelector('[data-crm-field="note"]').value.trim();
+    const notes = noteText
+      ? [{ text: noteText, createdAt: new Date().toISOString() }, ...(current.notes || [])]
+      : current.notes || [];
+    const saved = updateCrmRecord(row, {
+      status: root.querySelector('[data-crm-field="status"]').value,
+      owner: root.querySelector('[data-crm-field="owner"]').value.trim(),
+      followUp: root.querySelector('[data-crm-field="followUp"]').value,
+      notes,
+    });
+    root.querySelector('[data-crm-field="note"]').value = "";
+    root.querySelector("[data-crm-note-list]").innerHTML = renderNoteList(saved);
+    root.querySelector(".crm-save-status").textContent = "Saved";
+    renderView();
   });
 }
 
@@ -742,6 +1161,7 @@ function openDrawer(row) {
       ${detailItem("Risk Flags", row.risk_flags)}
       ${detailItem("Source", row.source_type)}
     </div>
+    ${crmEditor(row)}
     <div class="drawer-actions">
       ${row.maps_url ? `<a class="primary-action" href="${escapeHtml(row.maps_url)}" target="_blank" rel="noreferrer">Open map</a>` : ""}
       ${row.website ? `<a class="ghost-action" href="${escapeHtml(row.website)}" target="_blank" rel="noreferrer">Website</a>` : ""}
@@ -751,6 +1171,7 @@ function openDrawer(row) {
   els.drawer.classList.add("open");
   els.drawerBackdrop.classList.add("open");
   els.drawer.setAttribute("aria-hidden", "false");
+  bindDrawerCrm(row);
 }
 
 function detailItem(label, value) {
@@ -801,6 +1222,7 @@ function bindEvents() {
     state.city = "All";
     state.segment = "All";
     state.tier = "All";
+    state.crmStatus = "All";
     state.minScore = 0;
     els.searchInput.value = "";
     els.cityFilter.value = "All";
