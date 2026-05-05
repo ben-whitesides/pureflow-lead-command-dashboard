@@ -10,6 +10,7 @@ const navItems = [
   { id: "Davis County Add-Ons", label: "Davis Add-Ons", icon: "plus" },
   { id: "Gyms Sports Indoor Golf", label: "Gyms / Golf", icon: "activity" },
   { id: "Offices CPA Coworking", label: "Offices / CPA", icon: "office" },
+  { id: "Credit Proxy Check", label: "Credit Proxy", icon: "credit" },
   { id: "C Low Verify", label: "Low / Verify", icon: "verify" },
   { id: "Sources", label: "Sources", icon: "source" },
 ];
@@ -18,6 +19,9 @@ const tableColumns = [
   "priority_rank",
   "lead_score",
   "priority_tier",
+  "financial_quality_score",
+  "financial_quality_tier",
+  "recommended_terms",
   "city",
   "business_name",
   "category",
@@ -28,6 +32,24 @@ const tableColumns = [
   "decision_access",
   "water_cooler_fit",
   "pitch_angle",
+  "credit_proxy_notes",
+  "risk_flags",
+  "source_url",
+];
+
+const creditProxyColumns = [
+  "financial_quality_score",
+  "financial_quality_tier",
+  "recommended_terms",
+  "priority_tier",
+  "lead_score",
+  "city",
+  "business_name",
+  "sales_segment",
+  "address",
+  "phone",
+  "website",
+  "credit_proxy_notes",
   "risk_flags",
   "source_url",
 ];
@@ -86,6 +108,7 @@ function iconSvg(name) {
     office: '<path d="M5 20V5h9v15M14 9h5v11M8 8h3M8 12h3M8 16h3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>',
     verify: '<path d="M5 12l4 4L19 6" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>',
     source: '<path d="M6 5h12v14H6V5Zm3 4h6M9 13h6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>',
+    credit: '<path d="M12 3 20 6v6c0 5-3.4 8-8 9-4.6-1-8-4-8-9V6l8-3Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M8.5 12.2 11 14.7l4.8-5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>',
     water: '<path d="M12 3c4 5 6 8 6 11a6 6 0 0 1-12 0c0-3 2-6 6-11Z" fill="none" stroke="currentColor" stroke-width="2"/><path d="M9 15c1.2 1.1 3.8 1.1 6 0" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>',
     filter: '<path d="M4 5h16l-6 7v5l-4 2v-7L4 5Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>',
     map: '<path d="M9 18 4 20V6l5-2 6 2 5-2v14l-5 2-6-2Zm0 0V4m6 16V6" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>',
@@ -116,6 +139,8 @@ function applyFilters(rows) {
       row.category,
       row.address,
       row.priority_tier,
+      row.financial_quality_tier,
+      row.recommended_terms,
       row.route_zone,
     ]
       .join(" ")
@@ -182,6 +207,10 @@ function kpiCards(rows) {
   const offices = rows.filter((row) =>
     ["Coworking / Office Space", "Accounting / CPA"].includes(row.sales_segment),
   ).length;
+  const strongStability = rows.filter((row) => row.financial_quality_tier === "A - Strong Stability").length;
+  const cautionTerms = rows.filter((row) =>
+    ["C - Deposit / Autopay Recommended", "D - Verify Before Quote"].includes(row.financial_quality_tier),
+  ).length;
   const avgScore = rows.length
     ? Math.round(rows.reduce((sum, row) => sum + Number(row.lead_score || 0), 0) / rows.length)
     : 0;
@@ -190,6 +219,8 @@ function kpiCards(rows) {
     [a, "A walk-first", "Best fit for door knocking", "target"],
     [b, "B route-fill", "Good leads near the route", "route"],
     [gym + offices, "New scope wins", "Gyms, indoor golf, Picklr, offices, CPA", "activity"],
+    [strongStability, "Strong stability", "Best public-footprint proxy tier", "credit"],
+    [cautionTerms, "Terms caution", "Deposit, autopay, or verify first", "verify"],
     [avgScore, "Average score", "Quality of visible route pool", "dashboard"],
   ];
   return `<div class="kpi-grid">${cards
@@ -378,6 +409,35 @@ function routeMatrix(rows) {
   `;
 }
 
+function financialQualityPanel(rows) {
+  const counts = countBy(rows, "financial_quality_tier");
+  const max = Math.max(...counts.map(([, count]) => count), 1);
+  return `
+    <section class="panel financial-panel">
+      <div class="panel-head">
+        <div>
+          <h2 class="panel-title">Stability / Credit Proxy</h2>
+          <p class="panel-subtitle">Public-footprint terms guidance, not a bureau credit report.</p>
+        </div>
+        <div class="panel-mark">${iconSvg("credit")}</div>
+      </div>
+      <div class="chart-list">
+        ${counts
+          .map(
+            ([label, count]) => `
+              <div class="bar-row">
+                <div class="bar-label">${escapeHtml(label)}</div>
+                <div class="bar-track"><div class="bar-fill" style="width:${Math.round((count / max) * 100)}%"></div></div>
+                <div class="bar-count">${count}</div>
+              </div>
+            `,
+          )
+          .join("")}
+      </div>
+    </section>
+  `;
+}
+
 function segmentBars(rows) {
   const counts = countBy(rows, "sales_segment").slice(0, 10);
   const max = Math.max(...counts.map(([, count]) => count), 1);
@@ -491,6 +551,7 @@ function renderDashboard() {
     <div class="dashboard-mosaic">
       ${waterSystemCard(rows)}
       ${fieldPlaybook(rows)}
+      ${financialQualityPanel(rows)}
       ${segmentTileGrid(rows)}
       ${routeMatrix(rows)}
       ${topRoutes()}
@@ -515,15 +576,25 @@ function scoreClass(score) {
   return " low";
 }
 
+function financialScoreClass(score) {
+  const numeric = Number(score || 0);
+  if (numeric >= 82) return "";
+  if (numeric >= 70) return " mid";
+  return " low";
+}
+
 function tableCell(key, value) {
   if (key === "lead_score") {
     return `<span class="score-dot${scoreClass(value)}">${escapeHtml(value)}</span>`;
+  }
+  if (key === "financial_quality_score") {
+    return `<span class="score-dot${financialScoreClass(value)}">${escapeHtml(value)}</span>`;
   }
   if (String(key).includes("url") || key === "website") {
     if (!value) return "";
     return `<a href="${escapeHtml(value)}" target="_blank" rel="noreferrer">${escapeHtml(String(value).replace(/^https?:\/\//, "").slice(0, 46))}</a>`;
   }
-  if (key === "priority_tier") {
+  if (key === "priority_tier" || key === "financial_quality_tier") {
     const cls = String(value).startsWith("A") ? "a" : String(value).startsWith("B") ? "b" : "c";
     return `<span class="pill ${cls}">${escapeHtml(value)}</span>`;
   }
@@ -604,10 +675,20 @@ function renderSources() {
   renderTable("Sources", rows, ["Source", "How Used", "Link"], "Where the dashboard and expanded workbook data came from.");
 }
 
+function renderCreditProxy() {
+  renderTable(
+    "Credit Proxy Check",
+    leadPoolForView("Credit Proxy Check"),
+    creditProxyColumns,
+    "Public-footprint stability proxy for sales terms. Not a paid bureau credit report.",
+  );
+}
+
 function renderView() {
   renderNav();
   if (state.view === "dashboard") renderDashboard();
   else if (state.view === "Mini Route Guide") renderRouteGuide();
+  else if (state.view === "Credit Proxy Check") renderCreditProxy();
   else if (state.view === "Sources") renderSources();
   else renderTable(state.view, leadPoolForView(state.view));
   bindViewActions();
@@ -653,8 +734,11 @@ function openDrawer(row) {
       ${detailItem("Address", row.address)}
       ${detailItem("Phone", row.phone)}
       ${detailItem("Decision Access", row.decision_access)}
+      ${detailItem("Stability / Credit Proxy", `${row.financial_quality_tier || "Not scored"}${row.financial_quality_score ? ` (${row.financial_quality_score})` : ""}`)}
+      ${detailItem("Recommended Terms", row.recommended_terms)}
       ${detailItem("Water Cooler Fit", row.water_cooler_fit)}
       ${detailItem("Pitch Angle", row.pitch_angle)}
+      ${detailItem("Credit Proxy Notes", row.credit_proxy_notes)}
       ${detailItem("Risk Flags", row.risk_flags)}
       ${detailItem("Source", row.source_type)}
     </div>

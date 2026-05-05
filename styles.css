@@ -355,7 +355,7 @@ h1 {
 
 .kpi-grid {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
   gap: 12px;
   margin-bottom: 18px;
 }
@@ -497,6 +497,7 @@ h1 {
 
 .system-panel,
 .playbook-panel,
+.financial-panel,
 .segment-tile-panel,
 .route-matrix-panel,
 .top-routes-panel {
@@ -1127,7 +1128,6 @@ tbody tr:hover {
     grid-column: auto;
   }
 
-  .kpi-grid,
   .route-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
