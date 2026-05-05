@@ -89,6 +89,8 @@ const els = {
   scoreOutput: document.getElementById("scoreOutput"),
   resetFilters: document.getElementById("resetFilters"),
   crmModeAction: document.getElementById("crmModeAction"),
+  crmGuideAction: document.getElementById("crmGuideAction"),
+  topExportAction: document.getElementById("topExportAction"),
   drawer: document.getElementById("leadDrawer"),
   drawerContent: document.getElementById("drawerContent"),
   drawerClose: document.getElementById("drawerClose"),
@@ -267,6 +269,7 @@ function navCount(item) {
 
 function renderNav() {
   els.crmModeAction.classList.toggle("active", state.view === "CRM Mode");
+  els.crmGuideAction.classList.toggle("active", state.view === "CRM Mode" && state.crmGuideOpen);
   els.navList.innerHTML = navItems
     .map((item) => {
       const active = item.id === state.view ? " active" : "";
@@ -780,8 +783,6 @@ function renderCrmMode() {
           <p class="panel-subtitle">Local notes, status, follow-ups, and export tools for this browser.</p>
         </div>
         <div class="drawer-actions crm-actions">
-          <button class="ghost-action" type="button" data-crm-guide-toggle>${state.crmGuideOpen ? "Hide guide" : "How it works"}</button>
-          <button class="ghost-action" type="button" data-export="crm-notes">Export notes CSV</button>
           <button class="primary-action" type="button" data-export="twenty">Twenty import CSV</button>
         </div>
       </div>
@@ -1324,6 +1325,13 @@ function bindEvents() {
     state.view = "CRM Mode";
     renderView();
   });
+  els.crmGuideAction.addEventListener("click", () => {
+    const shouldToggle = state.view === "CRM Mode";
+    state.view = "CRM Mode";
+    state.crmGuideOpen = shouldToggle ? !state.crmGuideOpen : true;
+    renderView();
+  });
+  els.topExportAction.addEventListener("click", exportCrmNotes);
   els.drawerClose.addEventListener("click", closeDrawer);
   els.drawerBackdrop.addEventListener("click", closeDrawer);
   document.addEventListener("keydown", (event) => {

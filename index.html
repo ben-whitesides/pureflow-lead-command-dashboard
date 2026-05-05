@@ -38,10 +38,23 @@
           </div>
           <div class="topbar-actions">
             <button class="icon-button" id="resetFilters" type="button" title="Reset filters">Reset</button>
-            <button class="crm-mode-action" id="crmModeAction" type="button">CRM Mode</button>
-            <a class="primary-action" href="https://www.pureflowut.com/commercial.html" target="_blank" rel="noreferrer">
-              Commercial page
-            </a>
+            <div class="topbar-action-stack">
+              <button class="crm-mode-action" id="crmModeAction" type="button">CRM Mode</button>
+              <button class="topbar-sub-action guide-action" id="crmGuideAction" type="button">How it works</button>
+            </div>
+            <div class="topbar-action-stack">
+              <a
+                class="commercial-logo-link"
+                href="https://www.pureflowut.com/commercial.html"
+                target="_blank"
+                rel="noreferrer"
+                aria-label="Open PureFlow commercial page"
+                title="Open PureFlow commercial page"
+              >
+                <img src="assets/logo-header.png" alt="PureFlow" />
+              </a>
+              <button class="topbar-sub-action export-action" id="topExportAction" type="button">Export CSV</button>
+            </div>
           </div>
         </header>
 
