@@ -1142,10 +1142,17 @@ function renderNoteList(record) {
   return record.notes
     .slice(0, 8)
     .map(
-      (note) => `
-        <div class="crm-note">
-          <span>${escapeHtml(formatShortDate(note.createdAt))}</span>
-          <p>${escapeHtml(note.text)}</p>
+      (note, index) => `
+        <div class="crm-note" data-note-index="${index}">
+          <div class="crm-note-head">
+            <span>${escapeHtml(formatShortDate(note.createdAt))}${note.editedAt ? " edited" : ""}</span>
+            <button class="note-inline-action note-danger" type="button" data-note-delete="${index}">Delete</button>
+          </div>
+          <textarea data-note-edit="${index}" rows="3" aria-label="Edit saved CRM note">${escapeHtml(note.text)}</textarea>
+          <div class="crm-note-actions">
+            <button class="note-inline-action" type="button" data-note-save="${index}">Save note</button>
+            <span class="note-save-status" data-note-status="${index}" aria-live="polite"></span>
+          </div>
         </div>
       `,
     )
@@ -1198,9 +1205,62 @@ function crmEditor(row) {
   `;
 }
 
+function bindSavedNoteActions(root, row) {
+  root.querySelectorAll("[data-note-save]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const index = Number(button.dataset.noteSave);
+      const editor = root.querySelector(`[data-note-edit="${index}"]`);
+      const status = root.querySelector(`[data-note-status="${index}"]`);
+      const text = editor.value.trim();
+
+      if (!text) {
+        status.textContent = "Type a note or delete it.";
+        status.classList.add("warning");
+        return;
+      }
+
+      const current = crmRecord(row);
+      const notes = [...(current.notes || [])];
+      if (!notes[index]) return;
+
+      notes[index] = {
+        ...notes[index],
+        text,
+        editedAt: new Date().toISOString(),
+      };
+
+      const saved = updateCrmRecord(row, { notes });
+      root.querySelector("[data-crm-note-list]").innerHTML = renderNoteList(saved);
+      bindSavedNoteActions(root, row);
+      const savedStatus = root.querySelector(`[data-note-status="${index}"]`);
+      if (savedStatus) savedStatus.textContent = "Saved";
+      renderView();
+    });
+  });
+
+  root.querySelectorAll("[data-note-delete]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const index = Number(button.dataset.noteDelete);
+      if (!window.confirm("Delete this saved note?")) return;
+
+      const current = crmRecord(row);
+      const notes = [...(current.notes || [])];
+      if (!notes[index]) return;
+      notes.splice(index, 1);
+
+      const saved = updateCrmRecord(row, { notes });
+      root.querySelector("[data-crm-note-list]").innerHTML = renderNoteList(saved);
+      bindSavedNoteActions(root, row);
+      root.querySelector(".crm-save-status").textContent = "Note deleted";
+      renderView();
+    });
+  });
+}
+
 function bindDrawerCrm(row) {
   const root = els.drawerContent.querySelector(".crm-editor");
   if (!root) return;
+  bindSavedNoteActions(root, row);
   root.querySelectorAll("[data-crm-quick]").forEach((button) => {
     button.addEventListener("click", () => {
       const note = root.querySelector('[data-crm-field="note"]');
@@ -1222,6 +1282,7 @@ function bindDrawerCrm(row) {
     });
     root.querySelector('[data-crm-field="note"]').value = "";
     root.querySelector("[data-crm-note-list]").innerHTML = renderNoteList(saved);
+    bindSavedNoteActions(root, row);
     root.querySelector(".crm-save-status").textContent = "Saved";
     renderView();
   });

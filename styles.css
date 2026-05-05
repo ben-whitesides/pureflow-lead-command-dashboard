@@ -1140,16 +1140,75 @@ h1 {
   background: #fff;
 }
 
-.crm-note span {
+.crm-note-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.crm-note span,
+.note-save-status {
   color: var(--pf-muted);
   font-size: 0.68rem;
   font-weight: 800;
 }
 
-.crm-note p {
-  margin: 4px 0 0;
+.crm-note textarea {
+  width: 100%;
+  min-height: 76px;
+  border: 1px solid rgba(0, 200, 232, 0.22);
+  border-radius: 8px;
+  padding: 9px 10px;
+  background: #fbfdff;
   color: var(--pf-ink);
   font-size: 0.84rem;
+  resize: vertical;
+}
+
+.crm-note textarea:focus {
+  border-color: var(--pf-aqua);
+  outline: 2px solid rgba(0, 200, 232, 0.14);
+}
+
+.crm-note-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.note-inline-action {
+  min-height: 30px;
+  border: 1px solid var(--pf-line);
+  border-radius: 8px;
+  padding: 0 10px;
+  background: #fff;
+  color: var(--pf-navy);
+  font-size: 0.7rem;
+  font-weight: 900;
+  cursor: pointer;
+  text-transform: uppercase;
+}
+
+.note-inline-action:hover {
+  border-color: var(--pf-aqua);
+  color: var(--pf-navy);
+}
+
+.note-danger {
+  color: var(--pf-danger);
+}
+
+.note-danger:hover {
+  border-color: rgba(180, 35, 24, 0.35);
+  color: var(--pf-danger);
+}
+
+.note-save-status.warning {
+  color: var(--pf-warning);
 }
 
 .crm-empty-note {
