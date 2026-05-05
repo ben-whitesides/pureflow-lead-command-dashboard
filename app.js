@@ -6,6 +6,7 @@ const navItems = [
   { id: "A Walk First", label: "A Walk First", icon: "target" },
   { id: "B Review Route Fill", label: "B Review", icon: "review" },
   { id: "Sandy to Nephi Corridor", label: "Sandy to Nephi", icon: "corridor" },
+  { id: "Salt Lake Suburb Add-Ons", label: "SLC Suburbs", icon: "map" },
   { id: "Davis County Add-Ons", label: "Davis Add-Ons", icon: "plus" },
   { id: "Gyms Sports Indoor Golf", label: "Gyms / Golf", icon: "activity" },
   { id: "Offices CPA Coworking", label: "Offices / CPA", icon: "office" },
