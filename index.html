@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>PureFlow Lead Command</title>
+    <meta
+      name="description"
+      content="PureFlow route-ready lead dashboard for commercial water cooler prospecting."
+    />
+    <meta name="robots" content="noindex,nofollow" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar" aria-label="Dashboard navigation">
+        <a class="brand-lockup" href="https://www.pureflowut.com/" target="_blank" rel="noreferrer">
+          <img src="assets/logo-header.png" alt="PureFlow" />
+        </a>
+        <div class="sidebar-kicker">Commercial cooler prospecting</div>
+        <nav class="nav-list" id="navList"></nav>
+        <a class="workbook-link" href="PureFlow_Expanded_WaterCooler_Prospects.xlsx">
+          Open source workbook
+        </a>
+      </aside>
+
+      <main class="main-panel">
+        <header class="topbar">
+          <div>
+            <p class="eyebrow">Pure Water. Zero Compromise.</p>
+            <h1>Lead Command</h1>
+          </div>
+          <div class="topbar-actions">
+            <button class="icon-button" id="resetFilters" type="button" title="Reset filters">Reset</button>
+            <a class="primary-action" href="https://www.pureflowut.com/commercial.html" target="_blank" rel="noreferrer">
+              Commercial page
+            </a>
+          </div>
+        </header>
+
+        <section class="filter-strip" aria-label="Lead filters">
+          <label>
+            <span>Search</span>
+            <input id="searchInput" type="search" placeholder="Business, city, segment, address..." />
+          </label>
+          <label>
+            <span>City</span>
+            <select id="cityFilter"></select>
+          </label>
+          <label>
+            <span>Segment</span>
+            <select id="segmentFilter"></select>
+          </label>
+          <label>
+            <span>Tier</span>
+            <select id="tierFilter"></select>
+          </label>
+          <label>
+            <span>Score</span>
+            <input id="scoreFilter" type="range" min="0" max="100" value="0" />
+          </label>
+          <output id="scoreOutput">0+</output>
+        </section>
+
+        <section id="viewRoot" class="view-root"></section>
+      </main>
+    </div>
+
+    <aside class="drawer" id="leadDrawer" aria-label="Lead details" aria-hidden="true">
+      <button class="drawer-close" id="drawerClose" type="button" aria-label="Close details">×</button>
+      <div id="drawerContent"></div>
+    </aside>
+    <div class="drawer-backdrop" id="drawerBackdrop"></div>
+
+    <script src="data/leads-data.js"></script>
+    <script src="app.js"></script>
+  </body>
+</html>

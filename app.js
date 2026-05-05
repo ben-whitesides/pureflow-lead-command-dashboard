@@ -1,0 +1,737 @@
+const data = window.PUREFLOW_LEADS;
+
+const navItems = [
+  { id: "dashboard", label: "Dashboard", icon: "dashboard" },
+  { id: "Mini Route Guide", label: "Mini Route Guide", icon: "route" },
+  { id: "A Walk First", label: "A Walk First", icon: "target" },
+  { id: "B Review Route Fill", label: "B Review", icon: "review" },
+  { id: "Sandy to Nephi Corridor", label: "Sandy to Nephi", icon: "corridor" },
+  { id: "Davis County Add-Ons", label: "Davis Add-Ons", icon: "plus" },
+  { id: "Gyms Sports Indoor Golf", label: "Gyms / Golf", icon: "activity" },
+  { id: "Offices CPA Coworking", label: "Offices / CPA", icon: "office" },
+  { id: "C Low Verify", label: "Low / Verify", icon: "verify" },
+  { id: "Sources", label: "Sources", icon: "source" },
+];
+
+const tableColumns = [
+  "priority_rank",
+  "lead_score",
+  "priority_tier",
+  "city",
+  "business_name",
+  "category",
+  "sales_segment",
+  "address",
+  "phone",
+  "website",
+  "decision_access",
+  "water_cooler_fit",
+  "pitch_angle",
+  "risk_flags",
+  "source_url",
+];
+
+const state = {
+  view: "dashboard",
+  search: "",
+  city: "All",
+  segment: "All",
+  tier: "All",
+  minScore: 0,
+};
+
+const els = {
+  navList: document.getElementById("navList"),
+  viewRoot: document.getElementById("viewRoot"),
+  searchInput: document.getElementById("searchInput"),
+  cityFilter: document.getElementById("cityFilter"),
+  segmentFilter: document.getElementById("segmentFilter"),
+  tierFilter: document.getElementById("tierFilter"),
+  scoreFilter: document.getElementById("scoreFilter"),
+  scoreOutput: document.getElementById("scoreOutput"),
+  resetFilters: document.getElementById("resetFilters"),
+  drawer: document.getElementById("leadDrawer"),
+  drawerContent: document.getElementById("drawerContent"),
+  drawerClose: document.getElementById("drawerClose"),
+  drawerBackdrop: document.getElementById("drawerBackdrop"),
+};
+
+function formatNumber(value) {
+  return Number(value || 0).toLocaleString();
+}
+
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
+function unique(values) {
+  return [...new Set(values.filter(Boolean))].sort((a, b) => String(a).localeCompare(String(b)));
+}
+
+function iconSvg(name) {
+  const icons = {
+    dashboard: '<path d="M4 13h6V4H4v9Zm10 7h6V4h-6v16ZM4 20h6v-4H4v4Z"/>',
+    route: '<path d="M5 6.5a2.5 2.5 0 1 1 4.2 1.83L5 13l-4.2-4.67A2.5 2.5 0 0 1 5 6.5ZM19 17.5a2.5 2.5 0 1 1 4.2 1.83L19 24l-4.2-4.67A2.5 2.5 0 0 1 19 17.5Z" transform="scale(.82) translate(0 -2)"/><path d="M8 14c4 0 8-4 12-4M8 17c4 0 8 4 12 4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>',
+    target: '<path d="M12 3a9 9 0 1 0 9 9h-3a6 6 0 1 1-6-6V3Z"/><path d="M12 8a4 4 0 1 0 4 4h-3a1 1 0 1 1-1-1V8Z"/><path d="M13 3h8v3h-5v5h-3V3Z"/>',
+    review: '<path d="M5 4h14v16H5V4Zm3 4h8M8 12h8M8 16h5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>',
+    corridor: '<path d="M4 18c4-7 12-5 16-12M4 7c5 2 10 8 16 10" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="4" cy="18" r="2"/><circle cx="20" cy="6" r="2"/>',
+    plus: '<path d="M12 4v16M4 12h16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/>',
+    activity: '<path d="M4 13h4l2-7 4 14 2-7h4" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>',
+    office: '<path d="M5 20V5h9v15M14 9h5v11M8 8h3M8 12h3M8 16h3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>',
+    verify: '<path d="M5 12l4 4L19 6" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>',
+    source: '<path d="M6 5h12v14H6V5Zm3 4h6M9 13h6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>',
+    water: '<path d="M12 3c4 5 6 8 6 11a6 6 0 0 1-12 0c0-3 2-6 6-11Z" fill="none" stroke="currentColor" stroke-width="2"/><path d="M9 15c1.2 1.1 3.8 1.1 6 0" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>',
+    filter: '<path d="M4 5h16l-6 7v5l-4 2v-7L4 5Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>',
+    map: '<path d="M9 18 4 20V6l5-2 6 2 5-2v14l-5 2-6-2Zm0 0V4m6 16V6" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>',
+  };
+  return `<svg viewBox="0 0 24 24" aria-hidden="true">${icons[name] || icons.dashboard}</svg>`;
+}
+
+function sheetRows(sheetName) {
+  return data.sheets[sheetName] || [];
+}
+
+function isLeadRow(row) {
+  return Boolean(row.business_name || row.Business || row.source_url);
+}
+
+function leadPoolForView(view = state.view) {
+  if (view === "dashboard" || view === "Mini Route Guide") return data.allLeads;
+  if (view === "Sources") return sheetRows("Sources");
+  return sheetRows(view).filter(isLeadRow);
+}
+
+function applyFilters(rows) {
+  return rows.filter((row) => {
+    const text = [
+      row.business_name,
+      row.city,
+      row.sales_segment,
+      row.category,
+      row.address,
+      row.priority_tier,
+      row.route_zone,
+    ]
+      .join(" ")
+      .toLowerCase();
+    const score = Number(row.lead_score || 0);
+    return (
+      (!state.search || text.includes(state.search.toLowerCase())) &&
+      (state.city === "All" || row.city === state.city) &&
+      (state.segment === "All" || row.sales_segment === state.segment) &&
+      (state.tier === "All" || row.priority_tier === state.tier) &&
+      score >= state.minScore
+    );
+  });
+}
+
+function countBy(rows, key) {
+  const counts = new Map();
+  rows.forEach((row) => {
+    const value = row[key] || "Blank";
+    counts.set(value, (counts.get(value) || 0) + 1);
+  });
+  return [...counts.entries()].sort((a, b) => b[1] - a[1]);
+}
+
+function navCount(item) {
+  if (item.id === "dashboard") return data.allLeads.length;
+  return sheetRows(item.id).length;
+}
+
+function renderNav() {
+  els.navList.innerHTML = navItems
+    .map((item) => {
+      const active = item.id === state.view ? " active" : "";
+      return `
+        <button class="nav-button${active}" type="button" data-view="${escapeHtml(item.id)}">
+          <span class="nav-icon">${iconSvg(item.icon)}</span>
+          <span class="nav-label">${escapeHtml(item.label)}</span>
+          <span class="nav-count">${formatNumber(navCount(item))}</span>
+        </button>
+      `;
+    })
+    .join("");
+}
+
+function fillSelect(select, values, current) {
+  select.innerHTML = ["All", ...values]
+    .map((value) => `<option value="${escapeHtml(value)}">${escapeHtml(value)}</option>`)
+    .join("");
+  select.value = current;
+}
+
+function initFilters() {
+  fillSelect(els.cityFilter, unique(data.allLeads.map((row) => row.city)), state.city);
+  fillSelect(els.segmentFilter, unique(data.allLeads.map((row) => row.sales_segment)), state.segment);
+  fillSelect(els.tierFilter, unique(data.allLeads.map((row) => row.priority_tier)), state.tier);
+}
+
+function kpiCards(rows) {
+  const a = rows.filter((row) => row.priority_tier === "A - Walk First").length;
+  const b = rows.filter((row) => row.priority_tier === "B - Review / Route Fill").length;
+  const gym = rows.filter((row) =>
+    ["Gym / Fitness", "Indoor Golf", "Pickleball / Indoor Sports"].includes(row.sales_segment),
+  ).length;
+  const offices = rows.filter((row) =>
+    ["Coworking / Office Space", "Accounting / CPA"].includes(row.sales_segment),
+  ).length;
+  const avgScore = rows.length
+    ? Math.round(rows.reduce((sum, row) => sum + Number(row.lead_score || 0), 0) / rows.length)
+    : 0;
+  const cards = [
+    [rows.length, "Filtered prospects", "Live count after search and filters", "filter"],
+    [a, "A walk-first", "Best fit for door knocking", "target"],
+    [b, "B route-fill", "Good leads near the route", "route"],
+    [gym + offices, "New scope wins", "Gyms, indoor golf, Picklr, offices, CPA", "activity"],
+    [avgScore, "Average score", "Quality of visible route pool", "dashboard"],
+  ];
+  return `<div class="kpi-grid">${cards
+    .map(
+      ([value, label, note, icon]) => `
+        <div class="kpi-card">
+          <div class="kpi-icon">${iconSvg(icon)}</div>
+          <div>
+            <span class="kpi-value">${formatNumber(value)}</span>
+            <div class="kpi-label">${escapeHtml(label)}</div>
+            <p class="kpi-note">${escapeHtml(note)}</p>
+          </div>
+        </div>
+      `,
+    )
+    .join("")}</div>`;
+}
+
+function routeStats(rows) {
+  const routeCount = new Set(rows.map((row) => row.mini_route_group).filter(Boolean)).size;
+  const cities = new Set(rows.map((row) => row.city).filter(Boolean)).size;
+  const strongSegments = rows.filter((row) =>
+    ["Pickleball / Indoor Sports", "Indoor Golf", "Gym / Fitness", "Coworking / Office Space", "Accounting / CPA"].includes(row.sales_segment),
+  ).length;
+  return [
+    ["Visible routes", routeCount],
+    ["Cities", cities],
+    ["New-scope targets", strongSegments],
+  ];
+}
+
+function waterSystemCard(rows) {
+  const a = rows.filter((row) => row.priority_tier === "A - Walk First").length;
+  const b = rows.filter((row) => row.priority_tier === "B - Review / Route Fill").length;
+  const total = Math.max(rows.length, 1);
+  const aPct = Math.round((a / total) * 100);
+  const bPct = Math.round((b / total) * 100);
+  return `
+    <section class="panel system-panel">
+      <div class="panel-head">
+        <div>
+          <h2 class="panel-title">Commercial Cooler Fit</h2>
+          <p class="panel-subtitle">Visual read on the filtered lead pool.</p>
+        </div>
+        <div class="panel-mark">${iconSvg("water")}</div>
+      </div>
+      <div class="cooler-visual" aria-label="Commercial cooler fit">
+        <div class="cooler-tower">
+          <div class="cooler-slot"></div>
+          <div class="cooler-drop"></div>
+          <div class="cooler-base"></div>
+        </div>
+        <div class="cooler-copy">
+          <span class="field-label">Route quality mix</span>
+          <strong>${aPct}% A-fit</strong>
+          <p>Prioritize walk-in-ready operators, then fill with nearby B leads while the rep is already in the area.</p>
+        </div>
+      </div>
+      <div class="quality-bars">
+        <div>
+          <span>A Lead Concentration</span>
+          <div class="bar-track"><div class="bar-fill" style="width:${aPct}%"></div></div>
+        </div>
+        <div>
+          <span>B Fill-In Coverage</span>
+          <div class="bar-track"><div class="bar-fill secondary" style="width:${bPct}%"></div></div>
+        </div>
+      </div>
+    </section>
+  `;
+}
+
+function fieldPlaybook(rows) {
+  const stats = routeStats(rows);
+  return `
+    <section class="panel playbook-panel">
+      <div class="panel-head">
+        <div>
+          <h2 class="panel-title">Field Playbook</h2>
+          <p class="panel-subtitle">Same logic as the workbook, tuned for the rep.</p>
+        </div>
+      </div>
+      <div class="playbook-grid">
+        ${stats
+          .map(
+            ([label, value]) => `
+              <div class="playbook-stat">
+                <strong>${formatNumber(value)}</strong>
+                <span>${escapeHtml(label)}</span>
+              </div>
+            `,
+          )
+          .join("")}
+      </div>
+      <ol class="playbook-steps">
+        <li><span>01</span><strong>Open the route guide</strong><p>Pick a city or zone before drilling into individual businesses.</p></li>
+        <li><span>02</span><strong>Knock A leads first</strong><p>Owner-operated, high-water-use businesses with the clearest close path.</p></li>
+        <li><span>03</span><strong>Use B leads as fill</strong><p>Still good prospects, but verify manager access or buying authority.</p></li>
+      </ol>
+    </section>
+  `;
+}
+
+function segmentTileGrid(rows) {
+  const items = countBy(rows, "sales_segment").slice(0, 6);
+  const total = Math.max(rows.length, 1);
+  return `
+    <section class="panel segment-tile-panel">
+      <div class="panel-head">
+        <div>
+          <h2 class="panel-title">Prospect Mix</h2>
+          <p class="panel-subtitle">Grid view of the strongest current buckets.</p>
+        </div>
+      </div>
+      <div class="segment-tile-grid">
+        ${items
+          .map(([segment, count], index) => {
+            const pct = Math.round((count / total) * 100);
+            return `
+              <button class="segment-tile tone-${index + 1}" type="button" data-segment="${escapeHtml(segment)}">
+                <span class="segment-index">${String(index + 1).padStart(2, "0")}</span>
+                <strong>${escapeHtml(segment)}</strong>
+                <span>${count} leads · ${pct}% of view</span>
+              </button>
+            `;
+          })
+          .join("")}
+      </div>
+    </section>
+  `;
+}
+
+function routeMatrix(rows) {
+  if (!rows.length) return "";
+  const preferredSegments = [
+    "Gym / Fitness",
+    "Indoor Golf",
+    "Pickleball / Indoor Sports",
+    "Medical / Med Spa",
+    "Accounting / CPA",
+    "Coworking / Office Space",
+    "Salon / Beauty",
+    "Auto / Blue Collar",
+  ];
+  const rankedSegments = [
+    ...preferredSegments.filter((segment) => rows.some((row) => row.sales_segment === segment)),
+    ...countBy(rows, "sales_segment").map(([segment]) => segment),
+  ];
+  const segments = rankedSegments.filter((segment, index) => segment && rankedSegments.indexOf(segment) === index).slice(0, 5);
+  const cities = countBy(rows, "city")
+    .slice(0, 7)
+    .map(([city]) => city);
+  return `
+    <section class="panel route-matrix-panel">
+      <div class="panel-head">
+        <div>
+          <h2 class="panel-title">Route Matrix</h2>
+          <p class="panel-subtitle">Top city and segment intersections for fast territory planning.</p>
+        </div>
+        <div class="panel-mark">${iconSvg("map")}</div>
+      </div>
+      <div class="route-matrix-grid" style="--matrix-cols:${segments.length}">
+        <div class="matrix-head">City</div>
+        ${segments.map((segment) => `<div class="matrix-head">${escapeHtml(segment)}</div>`).join("")}
+        ${cities
+          .map(
+            (city) => `
+              <div class="matrix-city">${escapeHtml(city)}</div>
+              ${segments
+                .map((segment) => {
+                  const cellRows = rows.filter((row) => row.city === city && row.sales_segment === segment);
+                  const aRows = cellRows.filter((row) => row.priority_tier === "A - Walk First").length;
+                  return `
+                    <button class="matrix-cell" type="button" data-city="${escapeHtml(city)}">
+                      <strong>${cellRows.length}</strong>
+                      <span>${aRows} A</span>
+                    </button>
+                  `;
+                })
+                .join("")}
+            `,
+          )
+          .join("")}
+      </div>
+    </section>
+  `;
+}
+
+function segmentBars(rows) {
+  const counts = countBy(rows, "sales_segment").slice(0, 10);
+  const max = Math.max(...counts.map(([, count]) => count), 1);
+  return `
+    <div class="panel">
+      <div class="panel-head">
+        <div>
+          <h2 class="panel-title">Segment Heat</h2>
+          <p class="panel-subtitle">Where the water-cooler use case is densest.</p>
+        </div>
+      </div>
+      <div class="chart-list">
+        ${counts
+          .map(
+            ([label, count]) => `
+              <div class="bar-row">
+                <div class="bar-label">${escapeHtml(label)}</div>
+                <div class="bar-track"><div class="bar-fill" style="width:${Math.round((count / max) * 100)}%"></div></div>
+                <div class="bar-count">${count}</div>
+              </div>
+            `,
+          )
+          .join("")}
+      </div>
+    </div>`;
+}
+
+function cityPriority(rows) {
+  const counts = countBy(rows, "city").slice(0, 14);
+  return `
+    <div class="panel">
+      <div class="panel-head">
+        <div>
+          <h2 class="panel-title">City Density</h2>
+          <p class="panel-subtitle">Use these as route anchors.</p>
+        </div>
+      </div>
+      <div class="city-list">
+        ${counts
+          .map(
+            ([city, count]) => `
+              <button class="city-row" type="button" data-city="${escapeHtml(city)}">
+                <strong>${escapeHtml(city)}</strong>
+                <span>${count} leads</span>
+              </button>
+            `,
+          )
+          .join("")}
+      </div>
+    </div>`;
+}
+
+function topRoutes() {
+  const routes = sheetRows("Mini Route Guide")
+    .slice()
+    .sort((a, b) => Number(b["A Leads"] || 0) - Number(a["A Leads"] || 0))
+    .slice(0, 8);
+  return `
+    <div class="panel top-routes-panel">
+      <div class="panel-head">
+        <div>
+          <h2 class="panel-title">Best Mini Routes</h2>
+          <p class="panel-subtitle">A-lead heavy areas to work first.</p>
+        </div>
+      </div>
+      <div class="route-grid">
+        ${routes
+          .map(
+            (route) => `
+              <button class="route-card" type="button" data-city="${escapeHtml(route.City)}">
+                <div class="badge-line">
+                  <span class="pill a">${route["A Leads"] || 0} A</span>
+                  <span class="pill b">${route["B Leads"] || 0} B</span>
+                  <span class="pill">${escapeHtml(route["Route Zone"] || "")}</span>
+                </div>
+                <strong>${escapeHtml(route.City || "")}</strong>
+                <span>${escapeHtml(route["Top Segments"] || "")}</span>
+              </button>
+            `,
+          )
+          .join("")}
+      </div>
+    </div>`;
+}
+
+function renderDashboard() {
+  const rows = applyFilters(data.allLeads);
+  const aCount = rows.filter((row) => row.priority_tier === "A - Walk First").length;
+  const routeCount = new Set(rows.map((row) => row.mini_route_group).filter(Boolean)).size;
+  els.viewRoot.innerHTML = `
+    <section class="panel hero-panel command-hero">
+      <div>
+        <p class="eyebrow">Commercial hydration targets</p>
+        <h2>Route-ready prospects for offices, gyms, lounges, shops, and clinics.</h2>
+        <p>
+          This dashboard turns the workbook into field mode: start with A leads, use B leads as
+          nearby fill-in, and click any row for pitch angle, map link, source, and risk flags.
+        </p>
+        <div class="drawer-actions">
+          <button class="primary-action" type="button" data-view-jump="Mini Route Guide">Open route guide</button>
+          <button class="ghost-action" type="button" data-view-jump="A Walk First">Start A leads</button>
+        </div>
+      </div>
+      <div class="route-focus">
+        <div class="route-chip"><strong>${formatNumber(aCount)}</strong><span>A leads currently visible</span></div>
+        <div class="route-chip"><strong>${formatNumber(routeCount)}</strong><span>mini route groups</span></div>
+        <div class="route-chip"><strong>Own it</strong><span>Replace jug/bottle systems with PureFlow commercial coolers</span></div>
+      </div>
+    </section>
+    ${kpiCards(rows)}
+    <div class="dashboard-mosaic">
+      ${waterSystemCard(rows)}
+      ${fieldPlaybook(rows)}
+      ${segmentTileGrid(rows)}
+      ${routeMatrix(rows)}
+      ${topRoutes()}
+      ${segmentBars(rows)}
+      ${cityPriority(rows)}
+    </div>
+  `;
+}
+
+function columnLabel(key) {
+  return key
+    .replaceAll("_", " ")
+    .replace(/\b\w/g, (letter) => letter.toUpperCase())
+    .replace("Url", "URL")
+    .replace("Cpa", "CPA");
+}
+
+function scoreClass(score) {
+  const numeric = Number(score || 0);
+  if (numeric >= 88) return "";
+  if (numeric >= 70) return " mid";
+  return " low";
+}
+
+function tableCell(key, value) {
+  if (key === "lead_score") {
+    return `<span class="score-dot${scoreClass(value)}">${escapeHtml(value)}</span>`;
+  }
+  if (String(key).includes("url") || key === "website") {
+    if (!value) return "";
+    return `<a href="${escapeHtml(value)}" target="_blank" rel="noreferrer">${escapeHtml(String(value).replace(/^https?:\/\//, "").slice(0, 46))}</a>`;
+  }
+  if (key === "priority_tier") {
+    const cls = String(value).startsWith("A") ? "a" : String(value).startsWith("B") ? "b" : "c";
+    return `<span class="pill ${cls}">${escapeHtml(value)}</span>`;
+  }
+  return escapeHtml(value);
+}
+
+function renderTable(title, rows, columns = tableColumns, subtitle = "") {
+  const filtered = applyFilters(rows);
+  if (!filtered.length) {
+    els.viewRoot.innerHTML = `
+      <div class="empty-state">
+        <strong>No leads match the current filters.</strong><br />
+        Reset filters or lower the score threshold.
+      </div>
+    `;
+    return;
+  }
+  els.viewRoot.innerHTML = `
+    <section class="panel table-panel">
+      <div class="table-toolbar">
+        <div>
+          <h2 class="panel-title">${escapeHtml(title)}</h2>
+          <p class="panel-subtitle">${escapeHtml(subtitle || `${formatNumber(filtered.length)} visible rows`)}</p>
+        </div>
+        <span class="pill">${formatNumber(filtered.length)} rows</span>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>${columns.map((column) => `<th>${escapeHtml(columnLabel(column))}</th>`).join("")}</tr>
+          </thead>
+          <tbody>
+            ${filtered
+              .map(
+                (row, index) => `
+                  <tr data-row-index="${index}">
+                    ${columns.map((column) => `<td>${tableCell(column, row[column])}</td>`).join("")}
+                  </tr>
+                `,
+              )
+              .join("")}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  `;
+  [...els.viewRoot.querySelectorAll("tbody tr")].forEach((tr) => {
+    tr.addEventListener("click", (event) => {
+      if (event.target.closest("a")) return;
+      openDrawer(filtered[Number(tr.dataset.rowIndex)]);
+    });
+  });
+}
+
+function renderRouteGuide() {
+  const routes = sheetRows("Mini Route Guide").filter((route) => {
+    const text = Object.values(route).join(" ").toLowerCase();
+    return (
+      (!state.search || text.includes(state.search.toLowerCase())) &&
+      (state.city === "All" || route.City === state.city)
+    );
+  });
+  renderTable(
+    "Mini Route Guide",
+    routes.map((route) => ({
+      ...route,
+      business_name: route.City,
+      city: route.City,
+      lead_score: Number(route["A Leads"] || 0) + Number(route["B Leads"] || 0),
+    })),
+    ["Route Zone", "City", "A Leads", "B Leads", "Total", "Top Segments", "Best First Stops", "Route Note"],
+    "Grouped by route zone and city for door knocking simplicity.",
+  );
+}
+
+function renderSources() {
+  const rows = sheetRows("Sources");
+  renderTable("Sources", rows, ["Source", "How Used", "Link"], "Where the dashboard and expanded workbook data came from.");
+}
+
+function renderView() {
+  renderNav();
+  if (state.view === "dashboard") renderDashboard();
+  else if (state.view === "Mini Route Guide") renderRouteGuide();
+  else if (state.view === "Sources") renderSources();
+  else renderTable(state.view, leadPoolForView(state.view));
+  bindViewActions();
+}
+
+function bindViewActions() {
+  els.viewRoot.querySelectorAll("[data-view-jump]").forEach((button) => {
+    button.addEventListener("click", () => {
+      state.view = button.dataset.viewJump;
+      renderView();
+    });
+  });
+  els.viewRoot.querySelectorAll("[data-city]").forEach((button) => {
+    button.addEventListener("click", () => {
+      state.city = button.dataset.city;
+      els.cityFilter.value = state.city;
+      state.view = "A Walk First";
+      renderView();
+    });
+  });
+  els.viewRoot.querySelectorAll("[data-segment]").forEach((button) => {
+    button.addEventListener("click", () => {
+      state.segment = button.dataset.segment;
+      els.segmentFilter.value = state.segment;
+      state.view = "A Walk First";
+      renderView();
+    });
+  });
+}
+
+function openDrawer(row) {
+  if (!row || !row.business_name) return;
+  els.drawerContent.innerHTML = `
+    <p class="eyebrow">${escapeHtml(row.priority_tier || "Lead detail")}</p>
+    <h2>${escapeHtml(row.business_name)}</h2>
+    <div class="badge-line">
+      <span class="pill">${escapeHtml(row.city || "")}</span>
+      <span class="pill">${escapeHtml(row.sales_segment || "")}</span>
+      <span class="pill a">Score ${escapeHtml(row.lead_score || "")}</span>
+    </div>
+    <div class="detail-grid">
+      ${detailItem("Category", row.category)}
+      ${detailItem("Address", row.address)}
+      ${detailItem("Phone", row.phone)}
+      ${detailItem("Decision Access", row.decision_access)}
+      ${detailItem("Water Cooler Fit", row.water_cooler_fit)}
+      ${detailItem("Pitch Angle", row.pitch_angle)}
+      ${detailItem("Risk Flags", row.risk_flags)}
+      ${detailItem("Source", row.source_type)}
+    </div>
+    <div class="drawer-actions">
+      ${row.maps_url ? `<a class="primary-action" href="${escapeHtml(row.maps_url)}" target="_blank" rel="noreferrer">Open map</a>` : ""}
+      ${row.website ? `<a class="ghost-action" href="${escapeHtml(row.website)}" target="_blank" rel="noreferrer">Website</a>` : ""}
+      ${row.source_url ? `<a class="ghost-action" href="${escapeHtml(row.source_url)}" target="_blank" rel="noreferrer">Source</a>` : ""}
+    </div>
+  `;
+  els.drawer.classList.add("open");
+  els.drawerBackdrop.classList.add("open");
+  els.drawer.setAttribute("aria-hidden", "false");
+}
+
+function detailItem(label, value) {
+  return `
+    <div class="detail-item">
+      <span>${escapeHtml(label)}</span>
+      <p>${escapeHtml(value || "Not listed")}</p>
+    </div>
+  `;
+}
+
+function closeDrawer() {
+  els.drawer.classList.remove("open");
+  els.drawerBackdrop.classList.remove("open");
+  els.drawer.setAttribute("aria-hidden", "true");
+}
+
+function bindEvents() {
+  els.navList.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-view]");
+    if (!button) return;
+    state.view = button.dataset.view;
+    renderView();
+  });
+  els.searchInput.addEventListener("input", () => {
+    state.search = els.searchInput.value;
+    renderView();
+  });
+  els.cityFilter.addEventListener("change", () => {
+    state.city = els.cityFilter.value;
+    renderView();
+  });
+  els.segmentFilter.addEventListener("change", () => {
+    state.segment = els.segmentFilter.value;
+    renderView();
+  });
+  els.tierFilter.addEventListener("change", () => {
+    state.tier = els.tierFilter.value;
+    renderView();
+  });
+  els.scoreFilter.addEventListener("input", () => {
+    state.minScore = Number(els.scoreFilter.value);
+    els.scoreOutput.textContent = `${state.minScore}+`;
+    renderView();
+  });
+  els.resetFilters.addEventListener("click", () => {
+    state.search = "";
+    state.city = "All";
+    state.segment = "All";
+    state.tier = "All";
+    state.minScore = 0;
+    els.searchInput.value = "";
+    els.cityFilter.value = "All";
+    els.segmentFilter.value = "All";
+    els.tierFilter.value = "All";
+    els.scoreFilter.value = "0";
+    els.scoreOutput.textContent = "0+";
+    renderView();
+  });
+  els.drawerClose.addEventListener("click", closeDrawer);
+  els.drawerBackdrop.addEventListener("click", closeDrawer);
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") closeDrawer();
+  });
+}
+
+initFilters();
+bindEvents();
+renderView();
